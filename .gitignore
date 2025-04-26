@@ -1,0 +1,6 @@
+.vs*
+*.pdf
+*.ilk
+*.obj
+*.pdb
+*.exe
