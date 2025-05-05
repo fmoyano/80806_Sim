@@ -5,26 +5,26 @@ static unsigned char mov_instruction_code = 0x22;
 
 static char* RegisterByteNames[8] =
 {
-	"AL",
-	"CL",
-	"DL",
-	"BL",
-	"AH",
-	"CH",
-	"DH",
-	"BH"
+	"al",
+	"cl",
+	"dl",
+	"bl",
+	"ah",
+	"ch",
+	"dh",
+	"bh"
 };
 
 static char* RegisterWordNames[8] =
 {
-	"AX",
-	"CX",
-	"DX",
-	"BX",
-	"SP",
-	"BP",
-	"SI",
-	"DI"
+	"ax",
+	"cx",
+	"dx",
+	"bx",
+	"sp",
+	"bp",
+	"si",
+	"di"
 };
 
 
