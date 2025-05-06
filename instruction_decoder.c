@@ -3,6 +3,7 @@
 
 static unsigned char register_memory_mov = 0x22;
 static unsigned char immediate_register_mov = 0x0b;
+static unsigned char immediate_register_memory_mov = 0x63;
 
 static char* RegisterByteNames[8] =
 {
@@ -200,12 +201,12 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 				get_byte_register_name(second_byte >> 3, register_to_store);
 			}
 
-			if ((second_byte & 7) != 6)
+			if ((second_byte & 7) != 6) //RM !=6
 			{
 				char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
 				printf("[%s], %s\n", registers, register_to_store);
 			}
-			else
+			else //RM = 6 (direct address, no registers involved)
 			{
 				unsigned char third_byte = getc(fp);
 				unsigned char forth_byte = getc(fp);
@@ -239,6 +240,78 @@ void decode_Immediate_Register_Mov(unsigned char first_byte, FILE* fp)
 	}
 }
 
+void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
+{
+	printf("mov ");
+
+	unsigned char second_byte = getc(fp);
+
+	//Check MOD value (if we're moving the immediate value to register or to memory with displacement)
+	if ((second_byte >> 6 & 3) == 0) //MOD = 0 (No displacement)
+	{
+		if ((second_byte & 7) != 6) //RM != 6 (use registers for address)
+		{
+			char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
+			if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
+			{
+				unsigned char third_byte = getc(fp);
+				unsigned char forth_byte = getc(fp);
+				short immediate_value = forth_byte << 8 | third_byte;
+				printf("%s], word %d\n", registers, immediate_value);
+			}
+			else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
+			{
+				unsigned char third_byte = getc(fp);
+				printf("%s], byte %d\n", registers, third_byte);
+			}
+		}
+		else //RM = 6 (direct address)
+		{
+			if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
+			{
+				unsigned char third_byte = getc(fp);
+				unsigned char forth_byte = getc(fp);
+				short direct_address = forth_byte << 8 | third_byte;
+
+				unsigned char fifth_byte = getc(fp);
+				unsigned char sixth_byte = getc(fp);
+				short immediate_value = sixth_byte << 8 | fifth_byte;
+
+				printf("[%d], word %d\n", direct_address, immediate_value);
+			}
+			else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
+			{
+				unsigned char third_byte = getc(fp);
+				unsigned char forth_byte = getc(fp);
+				short direct_address = forth_byte << 8 | third_byte;
+
+				unsigned char fifth_byte = getc(fp);				
+				printf("[%d], byte %d\n", direct_address, fifth_byte);
+			}
+		}
+	}
+	else if ((second_byte >> 6 & 3) == 1) //MOD = 1 (8-bit displacement)
+	{
+		printf("Not implemented (8-bit displacement)\n");
+		getc(fp); //displacement
+		getc(fp);
+		if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
+			getc(fp); //immediate value
+	}
+	else if ((second_byte >> 6 & 3) == 2) //MOD = 2 (16-bit displacement)
+	{
+		printf("Not implemented (16-bit displacement)\n");
+		getc(fp); getc(fp); //displacement
+		getc(fp); 
+		if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
+			getc(fp); //immediate value
+	}
+	else if ((second_byte >> 6 & 3) == 3) //TODO: I think this case can be skipped, as it's covered by a different instruction
+	{
+		printf("WEIRD!");
+	}	
+}
+
 int main(int argc, char** argv)
 {
 	if (argc < 2)
@@ -270,7 +343,10 @@ int main(int argc, char** argv)
 		{
 			decode_Immediate_Register_Mov(first_byte, fp);
 		}
-
+		else if ((first_byte >> 1) == immediate_register_memory_mov)
+		{
+			decode_immediate_register_memory_mov(first_byte, fp);
+		}
 	}
 	
 	return 0;	
