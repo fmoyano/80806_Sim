@@ -4,6 +4,8 @@
 static unsigned char register_memory_mov = 0x22;
 static unsigned char immediate_register_mov = 0x0b;
 static unsigned char immediate_register_memory_mov = 0x63;
+static unsigned char memory_to_accumulator_mov = 0x50;
+static unsigned char accumulator_to_memory_mov = 0x51;
 
 static char* RegisterByteNames[8] =
 {
@@ -336,6 +338,38 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 	}	
 }
 
+void decode_accumulator_memory_mov(unsigned char first_byte, FILE* fp, int to_accumulator)
+{
+	printf("mov ");
+	
+	unsigned char addr_low = getc(fp);
+	if ((first_byte & 1) == 1) //W = 1 (16 bit address)
+	{
+		unsigned char addr_high = getc(fp);
+		short addr = addr_high << 8 | addr_low;
+
+		if (to_accumulator)
+		{
+			printf("ax, [%d]\n", addr);
+		}
+		else
+		{
+			printf("[%d], ax\n", addr);
+		}
+	}
+	else if ((first_byte & 1) == 0) //W = 0 (8 bit address)
+	{
+		if (to_accumulator)
+		{
+			printf("ax, [%d]\n", addr_low);
+		}
+		else
+		{
+			printf("[%d], ax\n", addr_low);
+		}
+	}
+}
+
 int main(int argc, char** argv)
 {
 	if (argc < 2)
@@ -371,6 +405,11 @@ int main(int argc, char** argv)
 		{
 			decode_immediate_register_memory_mov(first_byte, fp);
 		}
+		else if ((first_byte >> 1) == memory_to_accumulator_mov || 
+			(first_byte >> 1) == accumulator_to_memory_mov)
+		{
+			decode_accumulator_memory_mov(first_byte, fp, ((first_byte >> 1 & 1) == 0));
+		}		
 	}
 	
 	return 0;	
