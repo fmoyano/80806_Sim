@@ -292,19 +292,43 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 	}
 	else if ((second_byte >> 6 & 3) == 1) //MOD = 1 (8-bit displacement)
 	{
-		printf("Not implemented (8-bit displacement)\n");
-		getc(fp); //displacement
-		getc(fp);
+		char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
 		if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
-			getc(fp); //immediate value
+		{
+			unsigned char displacement = getc(fp);
+			unsigned char low_value = getc(fp);
+			unsigned char high_value = getc(fp);
+			short immediate_value = high_value << 8 | low_value;
+			printf("%s + %d], word %d\n", registers, displacement, immediate_value);
+		}
+		else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
+		{
+			unsigned char displacement = getc(fp);
+			unsigned char low_value = getc(fp);						
+			printf("%s + %d], byte %d\n", registers, displacement, low_value);
+		}
 	}
 	else if ((second_byte >> 6 & 3) == 2) //MOD = 2 (16-bit displacement)
 	{
-		printf("Not implemented (16-bit displacement)\n");
-		getc(fp); getc(fp); //displacement
-		getc(fp); 
+		char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
 		if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
-			getc(fp); //immediate value
+		{
+			unsigned char displacement_low = getc(fp);
+			unsigned char displacement_high = getc(fp);
+			short displacement = displacement_high << 8 | displacement_low;
+			unsigned char low_value = getc(fp);
+			unsigned char high_value = getc(fp);
+			short immediate_value = high_value << 8 | low_value;
+			printf("%s + %d], word %d\n", registers, displacement, immediate_value);
+		}
+		else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
+		{
+			unsigned char displacement_low = getc(fp);
+			unsigned char displacement_high = getc(fp);
+			short displacement = displacement_high << 8 | displacement_low;
+			unsigned char low_value = getc(fp);						
+			printf("%s + %d], byte %d\n", registers, displacement, low_value);
+		}
 	}
 	else if ((second_byte >> 6 & 3) == 3) //TODO: I think this case can be skipped, as it's covered by a different instruction
 	{
