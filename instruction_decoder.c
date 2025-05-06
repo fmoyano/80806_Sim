@@ -1,5 +1,10 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+#define MAX_SHORT_VAL_CHARACTERS 5
+#define MAX_LENGTH_DISPLACEMENT_TEXT (MAX_SHORT_VAL_CHARACTERS + 5)
+#define BASE_10 10
 
 static unsigned char register_memory_mov = 0x22;
 static unsigned char immediate_register_mov = 0x0b;
@@ -56,6 +61,20 @@ void get_byte_register_name(char byte, char* register_name)
 	strcpy_s(register_name, num_bytes, RegisterByteNames[byte & 7]);
 }
 
+void get_corrected_displacement_text(short val, char* text_to_print)
+{
+	if (val == 0)
+	{
+		sprintf_s(text_to_print, 2, "]");
+	}
+	else
+	{
+		char value_buffer[MAX_SHORT_VAL_CHARACTERS + 1];
+		_itoa_s(val, value_buffer, MAX_SHORT_VAL_CHARACTERS + 1, BASE_10);		
+		sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
+	}
+}
+
 void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 {
 	printf("mov ");
@@ -98,9 +117,12 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			{
 				get_byte_register_name(second_byte >> 3, register_to_load);
 			}
-
+			
 			//To register from memory
-			printf("%s, %s + %d]\n", register_to_load, registers, third_byte);
+			printf("%s, %s", register_to_load, registers);
+			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
+			get_corrected_displacement_text(third_byte, displacement_to_print);
+			printf("%s\n", displacement_to_print);
 		}
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
 		{
@@ -116,7 +138,10 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			}
 
 			//To memory from register
-			printf("%s + %d], %s\n", registers, third_byte, register_to_store);
+			printf("%s", registers);
+			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
+			get_corrected_displacement_text(third_byte, displacement_to_print);
+			printf("%s, %s\n", displacement_to_print, register_to_store);
 		}
 	}
 	else if (((second_byte >> 6) & 3) == 2) //MOD == 10 (memory mode with 16-bit displacement)
@@ -206,7 +231,7 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			if ((second_byte & 7) != 6) //RM !=6
 			{
 				char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
-				printf("[%s], %s\n", registers, register_to_store);
+				printf("%s], %s\n", registers, register_to_store);
 			}
 			else //RM = 6 (direct address, no registers involved)
 			{
@@ -371,7 +396,7 @@ void decode_accumulator_memory_mov(unsigned char first_byte, FILE* fp, int to_ac
 }
 
 int main(int argc, char** argv)
-{
+{	
 	if (argc < 2)
 	{
 		printf("Pass the name of the executable\n");
