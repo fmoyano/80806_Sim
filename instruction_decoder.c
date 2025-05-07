@@ -69,9 +69,19 @@ void get_corrected_displacement_text(short val, char* text_to_print)
 	}
 	else
 	{
+		short abs_val = abs(val);
 		char value_buffer[MAX_SHORT_VAL_CHARACTERS + 1];
-		_itoa_s(val, value_buffer, MAX_SHORT_VAL_CHARACTERS + 1, BASE_10);		
-		sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
+		_itoa_s(abs_val, value_buffer, MAX_SHORT_VAL_CHARACTERS + 1, BASE_10);
+
+		if (val < 0)
+		{
+			sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " - %s]", value_buffer);
+		}
+		else
+		{
+			sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
+		}
+		
 	}
 }
 
@@ -121,7 +131,7 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			//To register from memory
 			printf("%s, %s", register_to_load, registers);
 			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
-			get_corrected_displacement_text(third_byte, displacement_to_print);
+			get_corrected_displacement_text((signed char)third_byte, displacement_to_print);
 			printf("%s\n", displacement_to_print);
 		}
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
@@ -140,7 +150,7 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			//To memory from register
 			printf("%s", registers);
 			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
-			get_corrected_displacement_text(third_byte, displacement_to_print);
+			get_corrected_displacement_text((signed char)third_byte, displacement_to_print);
 			printf("%s, %s\n", displacement_to_print, register_to_store);
 		}
 	}
@@ -166,9 +176,12 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			{
 				get_byte_register_name(second_byte >> 3, register_to_load);
 			}
-
+			
 			//To register from memory
-			printf("%s, %s + %d]\n", register_to_load, registers, displacement);
+			printf("%s, %s", register_to_load, registers);
+			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
+			get_corrected_displacement_text(displacement, displacement_to_print);
+			printf("%s\n", displacement_to_print);
 		}
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
 		{
@@ -182,9 +195,13 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 			{
 				get_byte_register_name(second_byte >> 3, register_to_store);
 			}
-
+		
 			//To memory from register
-			printf("%s + %d], %s\n", registers, displacement, register_to_store);
+			printf("%s", registers);
+			char displacement_to_print[MAX_LENGTH_DISPLACEMENT_TEXT];
+			get_corrected_displacement_text(displacement, displacement_to_print);
+			printf("%s, %s\n", displacement_to_print, register_to_store);
+
 		}
 	}
 	else if (((second_byte >> 6) & 3) == 0) //MOD == 00 (no displacement except when R/M = 110)
@@ -263,7 +280,7 @@ void decode_Immediate_Register_Mov(unsigned char first_byte, FILE* fp)
 	else if ((first_byte >> 3 & 1) == 0) //W = 0
 	{
 		get_byte_register_name(first_byte & 7, register_to_load);
-		printf("%s, %d\n", register_to_load, second_byte);
+		printf("%s, %d\n", register_to_load, (signed char)second_byte);
 	}
 }
 
@@ -396,13 +413,14 @@ void decode_accumulator_memory_mov(unsigned char first_byte, FILE* fp, int to_ac
 }
 
 int main(int argc, char** argv)
-{	
+{		
 	if (argc < 2)
 	{
 		printf("Pass the name of the executable\n");
 		return -1;
 	}
 
+	//FILE *fp = fopen("listing_0040_challenge_movs", "rb");
 	FILE *fp = fopen(argv[1], "rb");
 	if (fp == NULL)
 	{
