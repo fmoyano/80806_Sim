@@ -6,13 +6,23 @@
 #define MAX_LENGTH_DISPLACEMENT_TEXT (MAX_SHORT_VAL_CHARACTERS + 5)
 #define BASE_10 10
 
+//Movs
 static unsigned char register_memory_mov = 0x22;
 static unsigned char immediate_register_mov = 0x0b;
 static unsigned char immediate_register_memory_mov = 0x63;
 static unsigned char memory_to_accumulator_mov = 0x50;
 static unsigned char accumulator_to_memory_mov = 0x51;
 
-static char* RegisterByteNames[8] =
+//Arith operators (add, sub, cmp)
+static unsigned char immediate_register_mem_arith = 0x20;
+static unsigned char register_memory_add = 0;
+static unsigned char immediate_accum_add = 0x02;
+static unsigned char register_memory_sub = 0x0a;
+static unsigned char immediate_accum_sub = 0x16;
+static unsigned char register_memory_cmp = 0x0e;
+static unsigned char immediate_accum_cmp = 0x1e;
+
+static char* RegisterByteNames[] =
 {
 	"al",
 	"cl",
@@ -24,7 +34,7 @@ static char* RegisterByteNames[8] =
 	"bh"
 };
 
-static char* RegisterWordNames[8] =
+static char* RegisterWordNames[] =
 {
 	"ax",
 	"cx",
@@ -36,7 +46,7 @@ static char* RegisterWordNames[8] =
 	"di"
 };
 
-static char* EffectiveAddressWithDisplacement[8] =
+static char* EffectiveAddressWithDisplacement[] =
 {
 	"[bx + si",
 	"[bx + di",
@@ -46,6 +56,11 @@ static char* EffectiveAddressWithDisplacement[8] =
 	"[di",
 	"[bp",
 	"[bx",
+};
+
+static char* Arith_Ops[] =
+{
+	"add ", "", "", "", "", "sub ", "", "cmp "
 };
 
 
@@ -80,14 +95,17 @@ void get_corrected_displacement_text(short val, char* text_to_print)
 		else
 		{
 			sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
-		}
-		
+		}		
 	}
 }
 
-void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
+void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op, int arith_op)
 {
-	printf("mov ");
+	if (is_mov_op)
+		printf("mov ");
+	else
+		printf("%s ", Arith_Ops[arith_op]);
+
 	unsigned char second_byte = getc(fp);
 
 	if (((second_byte >> 6) & 3) == 3) //MOD == 11 (register to register)
@@ -261,7 +279,7 @@ void decode_Register_Memory_Mov(unsigned char first_byte, FILE* fp)
 	}
 }
 
-void decode_Immediate_Register_Mov(unsigned char first_byte, FILE* fp)
+void decode_immediate_register_mov(unsigned char first_byte, FILE* fp)
 {
 	printf("mov ");
 
@@ -284,11 +302,15 @@ void decode_Immediate_Register_Mov(unsigned char first_byte, FILE* fp)
 	}
 }
 
-void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
+void decode_immediate_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov)
 {
-	printf("mov ");
-
 	unsigned char second_byte = getc(fp);
+
+	if (is_mov)
+		printf("mov ");
+	else
+		printf("%s ", Arith_Ops[second_byte >> 3 & 7]);
+	
 
 	//Check MOD value (if we're moving the immediate value to register or to memory with displacement)
 	if ((second_byte >> 6 & 3) == 0) //MOD = 0 (No displacement)
@@ -318,8 +340,12 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 				short direct_address = forth_byte << 8 | third_byte;
 
 				unsigned char fifth_byte = getc(fp);
-				unsigned char sixth_byte = getc(fp);
-				short immediate_value = sixth_byte << 8 | fifth_byte;
+				short immediate_value = fifth_byte;
+				if (is_mov || (first_byte >> 1 & 1) == 0) //S=0 for arith ops, meaning we should read the high byte value
+				{
+					unsigned char sixth_byte = getc(fp);
+					immediate_value = sixth_byte << 8 | fifth_byte;
+				}
 
 				printf("[%d], word %d\n", direct_address, immediate_value);
 			}
@@ -355,7 +381,8 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 	else if ((second_byte >> 6 & 3) == 2) //MOD = 2 (16-bit displacement)
 	{
 		char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
-		if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
+		if ((is_mov && (first_byte & 1) == 1) || //for mov instruction: W=1 (16 bit immediate value)
+			((first_byte & 3) == 1)) //for arith instruction: SW = 01 
 		{
 			unsigned char displacement_low = getc(fp);
 			unsigned char displacement_high = getc(fp);
@@ -365,7 +392,8 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 			short immediate_value = high_value << 8 | low_value;
 			printf("%s + %d], word %d\n", registers, displacement, immediate_value);
 		}
-		else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
+		else if (is_mov && (first_byte & 1) == 0 || //for mov instruction: W=0 (8 bit immediate value)
+			((first_byte >> 1) & 1 == 1)) //for arith instruction: SW = 01
 		{
 			unsigned char displacement_low = getc(fp);
 			unsigned char displacement_high = getc(fp);
@@ -374,15 +402,38 @@ void decode_immediate_register_memory_mov(unsigned char first_byte, FILE* fp)
 			printf("%s + %d], byte %d\n", registers, displacement, low_value);
 		}
 	}
-	else if ((second_byte >> 6 & 3) == 3) //TODO: I think this case can be skipped, as it's covered by a different instruction
+	//This is a weird case that I think it's not used for mov instructions, but only for add/sub/cmp instructions
+	else if ((second_byte >> 6 & 3) == 3) //MOD = 3 (register-to-register)
 	{
-		printf("WEIRD!");
+		if ((first_byte & 1) == 1) //W = 1 (destination is word register)
+		{
+			char register_to_load[] = "KO";
+			get_word_register_name(second_byte & 7, register_to_load);
+			unsigned char third_byte = getc(fp);
+			short immediate_value = third_byte;
+			if ((first_byte >> 1 & 1) == 0) //S=0
+			{
+				unsigned char forth_byte = getc(fp);
+				immediate_value = (forth_byte << 8) | third_byte;
+			}			
+			printf("%s, %d\n", register_to_load, immediate_value);
+		}
+		else if ((first_byte & 1) == 0) //W = 0 (destination is byte register)
+		{
+			char register_to_load[] = "KO";
+			get_byte_register_name(second_byte & 7, register_to_load);
+			unsigned char third_byte = getc(fp);								
+			printf("%s, %d\n", register_to_load, third_byte);
+		}
 	}	
 }
 
-void decode_accumulator_memory_mov(unsigned char first_byte, FILE* fp, int to_accumulator)
+void decode_accumulator(unsigned char first_byte, FILE* fp, int is_mov, int to_accumulator)
 {
-	printf("mov ");
+	if (is_mov)
+		printf("mov ");
+	else
+		printf("%s ", Arith_Ops[first_byte >> 3 & 7]);
 	
 	unsigned char addr_low = getc(fp);
 	if ((first_byte & 1) == 1) //W = 1 (16 bit address)
@@ -390,24 +441,32 @@ void decode_accumulator_memory_mov(unsigned char first_byte, FILE* fp, int to_ac
 		unsigned char addr_high = getc(fp);
 		short addr = addr_high << 8 | addr_low;
 
-		if (to_accumulator)
+		if (is_mov && to_accumulator)
 		{
 			printf("ax, [%d]\n", addr);
 		}
-		else
+		else if (is_mov)
 		{
 			printf("[%d], ax\n", addr);
+		}
+		else //16-bit immediate value to accumulator (ax)
+		{			
+			printf("ax, %d\n", addr); //addr is actually a 16-bit immediate value
 		}
 	}
 	else if ((first_byte & 1) == 0) //W = 0 (8 bit address)
 	{
-		if (to_accumulator)
+		if (is_mov && to_accumulator)
 		{
 			printf("ax, [%d]\n", addr_low);
 		}
-		else
+		else if (is_mov)
 		{
 			printf("[%d], ax\n", addr_low);
+		}
+		else //8-bit immediate value to accumulator (al)
+		{
+			printf("al, %d\n", (signed char)addr_low); //addr_low is actually an 8-bit immediate value (and it can be negative)
 		}
 	}
 }
@@ -420,7 +479,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	//FILE *fp = fopen("listing_0040_challenge_movs", "rb");
+	//FILE *fp = fopen("simple_arith", "rb");
 	FILE *fp = fopen(argv[1], "rb");
 	if (fp == NULL)
 	{
@@ -436,22 +495,30 @@ int main(int argc, char** argv)
 		if (first_byte_int == EOF) break;
 
 		unsigned char first_byte = (unsigned char)first_byte_int;
-		if (first_byte >> 2 == register_memory_mov)
+		if (first_byte >> 2 == register_memory_mov ||
+				first_byte >> 2 == register_memory_add ||
+				first_byte >> 2 == register_memory_sub ||
+				first_byte >> 2 == register_memory_cmp)
 		{
-			decode_Register_Memory_Mov(first_byte, fp);
+			decode_register_memory_op(first_byte, fp, first_byte >> 2 == register_memory_mov, first_byte >> 3 & 7);
 		}
 		else if ((first_byte >> 4) == immediate_register_mov)
 		{
-			decode_Immediate_Register_Mov(first_byte, fp);
+			decode_immediate_register_mov(first_byte, fp);
 		}
-		else if ((first_byte >> 1) == immediate_register_memory_mov)
+		else if ((first_byte >> 1) == immediate_register_memory_mov ||
+			 (first_byte >> 2) == immediate_register_mem_arith)
 		{
-			decode_immediate_register_memory_mov(first_byte, fp);
+			decode_immediate_register_memory_op(first_byte, fp, (first_byte >> 1) == immediate_register_memory_mov);
 		}
 		else if ((first_byte >> 1) == memory_to_accumulator_mov || 
-			(first_byte >> 1) == accumulator_to_memory_mov)
+			(first_byte >> 1) == accumulator_to_memory_mov || 
+			(first_byte >> 1) == immediate_accum_add ||
+			(first_byte >> 1) == immediate_accum_sub ||
+			(first_byte >> 1) == immediate_accum_cmp)
 		{
-			decode_accumulator_memory_mov(first_byte, fp, ((first_byte >> 1 & 1) == 0));
+			decode_accumulator(first_byte, fp, (first_byte >> 1) == memory_to_accumulator_mov || 
+			(first_byte >> 1) == accumulator_to_memory_mov, ((first_byte >> 1 & 1) == 0));
 		}		
 	}
 	
