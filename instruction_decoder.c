@@ -321,8 +321,14 @@ void decode_immediate_register_memory_op(unsigned char first_byte, FILE* fp, int
 			if ((first_byte & 1) == 1) //W=1 (16 bit immediate value)
 			{
 				unsigned char third_byte = getc(fp);
-				unsigned char forth_byte = getc(fp);
-				short immediate_value = forth_byte << 8 | third_byte;
+				short immediate_value = third_byte;
+
+				if (is_mov || (first_byte >> 1 & 1) == 0) //S=0 for arith ops, meaning we should read the high byte value
+				{
+					unsigned char forth_byte = getc(fp);
+					immediate_value = forth_byte << 8 | third_byte;
+				}
+
 				printf("%s], word %d\n", registers, immediate_value);
 			}
 			else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)
@@ -381,19 +387,22 @@ void decode_immediate_register_memory_op(unsigned char first_byte, FILE* fp, int
 	else if ((second_byte >> 6 & 3) == 2) //MOD = 2 (16-bit displacement)
 	{
 		char* registers = EffectiveAddressWithDisplacement[second_byte & 7];
-		if ((is_mov && (first_byte & 1) == 1) || //for mov instruction: W=1 (16 bit immediate value)
-			((first_byte & 3) == 1)) //for arith instruction: SW = 01 
+		if ((first_byte & 1) == 1) // W=1 (16 bit immediate value)			
 		{
 			unsigned char displacement_low = getc(fp);
 			unsigned char displacement_high = getc(fp);
 			short displacement = displacement_high << 8 | displacement_low;
+
 			unsigned char low_value = getc(fp);
-			unsigned char high_value = getc(fp);
-			short immediate_value = high_value << 8 | low_value;
+			short immediate_value = low_value;
+			if (is_mov || (first_byte >> 1 & 1) == 0) //S=0 for arith ops means one extra byte for immediate value
+			{
+				unsigned char high_value = getc(fp);
+				immediate_value = high_value << 8 | low_value;	
+			}			
 			printf("%s + %d], word %d\n", registers, displacement, immediate_value);
 		}
-		else if (is_mov && (first_byte & 1) == 0 || //for mov instruction: W=0 (8 bit immediate value)
-			((first_byte >> 1) & 1 == 1)) //for arith instruction: SW = 01
+		else if ((first_byte & 1) == 0) //W=0 (8 bit immediate value)			
 		{
 			unsigned char displacement_low = getc(fp);
 			unsigned char displacement_high = getc(fp);
