@@ -5,7 +5,7 @@
 #define MAX_SHORT_VAL_CHARACTERS 5
 #define MAX_LENGTH_DISPLACEMENT_TEXT (MAX_SHORT_VAL_CHARACTERS + 5)
 #define BASE_10 10
-#define MAX_JUMP_NAMES 5
+#define MAX_JUMP_NAME 10
 
 //Movs
 static unsigned char register_memory_mov = 0x22;
@@ -490,7 +490,7 @@ int is_jump(unsigned char instruction, char* jump)
 
 	if (instruction == je)
 	{
-		strcpy_s(jump, MAX_JUMP_NAMES, "je");
+		strcpy_s(jump, MAX_JUMP_NAME, "je");
 	}
 
 	return is_jump;
@@ -547,7 +547,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
-			char jump[MAX_JUMP_NAMES] = "KO";
+			char jump[MAX_JUMP_NAME] = "KO";
 			if (is_jump(first_byte, jump))
 			{
 				printf("%s ", jump);
