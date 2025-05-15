@@ -5,6 +5,7 @@
 #define MAX_SHORT_VAL_CHARACTERS 5
 #define MAX_LENGTH_DISPLACEMENT_TEXT (MAX_SHORT_VAL_CHARACTERS + 5)
 #define BASE_10 10
+#define MAX_JUMP_NAMES 5
 
 //Movs
 static unsigned char register_memory_mov = 0x22;
@@ -21,6 +22,9 @@ static unsigned char register_memory_sub = 0x0a;
 static unsigned char immediate_accum_sub = 0x16;
 static unsigned char register_memory_cmp = 0x0e;
 static unsigned char immediate_accum_cmp = 0x1e;
+
+//Jumps
+static unsigned char je = 0x74;
 
 static char* RegisterByteNames[] =
 {
@@ -480,6 +484,18 @@ void decode_accumulator(unsigned char first_byte, FILE* fp, int is_mov, int to_a
 	}
 }
 
+int is_jump(unsigned char instruction, char* jump)
+{
+	int is_jump = 1;
+
+	if (instruction == je)
+	{
+		strcpy_s(jump, MAX_JUMP_NAMES, "je");
+	}
+
+	return is_jump;
+}
+
 int main(int argc, char** argv)
 {		
 	if (argc < 2)
@@ -528,7 +544,28 @@ int main(int argc, char** argv)
 		{
 			decode_accumulator(first_byte, fp, (first_byte >> 1) == memory_to_accumulator_mov || 
 			(first_byte >> 1) == accumulator_to_memory_mov, ((first_byte >> 1 & 1) == 0));
-		}		
+		}
+		else
+		{
+			char jump[MAX_JUMP_NAMES] = "KO";
+			if (is_jump(first_byte, jump))
+			{
+				printf("%s ", jump);
+				//read jump destination in second byte
+				signed char offset = (signed char)fgetc(fp);
+
+				//This is something we need to do if we want to create an .asm file that is equivalent to using labels when assembled with NASM
+				//je $+0 means to jump 2 bytes before 
+				//jnz $+-2 means to jump 4 bytes before
+				//Which is equivalent to...
+				//label:
+				//je label
+				//jnz label
+				//But this saves the work of having to printf labels (moving up and down)
+				signed char final_offset = offset + 2;
+				printf("$+%d\n", final_offset);
+			}
+		}
 	}
 	
 	return 0;	
