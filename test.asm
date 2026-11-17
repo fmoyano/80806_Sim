@@ -1,13 +1,9 @@
 bits 16
 
-mov cx, bx
-mov ch, ah
-mov dx, bx
-mov si, bx
-mov bx, di
-mov al, cl
-mov ch, ch
-mov bx, ax
-mov bx, si
-mov sp, di
-mov bp, ax
+je $+0
+je $+-2
+je $+-4
+je $+-6
+je $+-8
+je $+-10
+je $+-12

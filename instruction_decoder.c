@@ -67,6 +67,11 @@ static char* Arith_Ops[] =
 	"add ", "", "", "", "", "sub ", "", "cmp "
 };
 
+static char* Jump_Instruction[][4] =
+{
+	""
+};
+
 
 void get_word_register_name(char byte, char* register_name)
 {
@@ -492,6 +497,10 @@ int is_jump(unsigned char instruction, char* jump)
 	{
 		strcpy_s(jump, MAX_JUMP_NAME, "je");
 	}
+	else
+	{
+		is_jump = 0;
+	}
 
 	return is_jump;
 }
@@ -545,7 +554,7 @@ int main(int argc, char** argv)
 			decode_accumulator(first_byte, fp, (first_byte >> 1) == memory_to_accumulator_mov || 
 			(first_byte >> 1) == accumulator_to_memory_mov, ((first_byte >> 1 & 1) == 0));
 		}
-		else
+		else if ((first_byte >> 4 & 7) == 7 || (first_byte >> 4 & 7) == 14)
 		{
 			char jump[MAX_JUMP_NAME] = "KO";
 			if (is_jump(first_byte, jump))
