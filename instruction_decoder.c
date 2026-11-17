@@ -75,35 +75,33 @@ static char* Jump_Instruction[][4] =
 
 void get_word_register_name(char byte, char* register_name)
 {
-	unsigned long long num_bytes = strlen("AX") + 1;
-	strcpy_s(register_name, num_bytes, RegisterWordNames[byte & 7]);	
+	snprintf(register_name, 3, "%s", RegisterWordNames[byte & 7]);
 }
 
 void get_byte_register_name(char byte, char* register_name)
 {
-	unsigned long long num_bytes = strlen("AL") + 1;
-	strcpy_s(register_name, num_bytes, RegisterByteNames[byte & 7]);
+	snprintf(register_name, 3, "%s", RegisterByteNames[byte & 7]);
 }
 
 void get_corrected_displacement_text(short val, char* text_to_print)
 {
 	if (val == 0)
 	{
-		sprintf_s(text_to_print, 2, "]");
+		snprintf(text_to_print, 2, "]");
 	}
 	else
 	{
-		short abs_val = abs(val);
+		int abs_val = abs((int)val);
 		char value_buffer[MAX_SHORT_VAL_CHARACTERS + 1];
-		_itoa_s(abs_val, value_buffer, MAX_SHORT_VAL_CHARACTERS + 1, BASE_10);
+		snprintf(value_buffer, sizeof(value_buffer), "%d", abs_val);
 
 		if (val < 0)
 		{
-			sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " - %s]", value_buffer);
+			snprintf(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " - %s]", value_buffer);
 		}
 		else
 		{
-			sprintf_s(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
+			snprintf(text_to_print, MAX_LENGTH_DISPLACEMENT_TEXT, " + %s]", value_buffer);
 		}		
 	}
 }
@@ -125,13 +123,19 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		{
 			get_word_register_name(second_byte, destination_register);
 			get_word_register_name(second_byte >> 3, source_register);
-			printf("%s, %s\n", destination_register, source_register);
+			if ((first_byte & 0x02) != 0) // D=1: REG is destination.
+				printf("%s, %s\n", source_register, destination_register);
+			else // D=0: R/M is destination.
+				printf("%s, %s\n", destination_register, source_register);
 		}
 		else if ((first_byte & 1) == 0) //W = 0
 		{
 			get_byte_register_name(second_byte, destination_register);
 			get_byte_register_name(second_byte >> 3, source_register);
-			printf("%s, %s\n", destination_register, source_register);
+			if ((first_byte & 0x02) != 0) // D=1: REG is destination.
+				printf("%s, %s\n", source_register, destination_register);
+			else // D=0: R/M is destination.
+				printf("%s, %s\n", destination_register, source_register);
 		}
 	}
 	else if (((second_byte >> 6) & 3) == 1) //MOD == 01 (memory mode with 8-bit displacement)
@@ -145,7 +149,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		if (((first_byte >> 1) & 1) == 1) //D = 1 (LOAD)
 		{
 			//get register to load
-			char* register_to_load = "register";
+			char register_to_load[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_load);
@@ -164,7 +168,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
 		{
 			//get register to store
-			char* register_to_store = "register";
+			char register_to_store[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_store);
@@ -194,7 +198,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		if (((first_byte >> 1) & 1) == 1) //D = 1 (LOAD)
 		{
 			//get register to load
-			char* register_to_load = "register";
+			char register_to_load[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_load);
@@ -213,7 +217,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
 		{
 			//get register to store
-			char* register_to_store = "register";
+			char register_to_store[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_store);
@@ -236,7 +240,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		if (((first_byte >> 1) & 1) == 1) //D = 1 (LOAD)
 		{
 			//get register to load
-			char* register_to_load = "register";
+			char register_to_load[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_load);
@@ -262,7 +266,7 @@ void decode_register_memory_op(unsigned char first_byte, FILE* fp, int is_mov_op
 		else if (((first_byte >> 1) & 1) == 0) //D = 0 (STORE)
 		{
 			//get register to store
-			char* register_to_store = "register";
+			char register_to_store[3];
 			if ((first_byte & 1) == 1) //W = 1
 			{
 				get_word_register_name(second_byte >> 3, register_to_store);
@@ -295,7 +299,7 @@ void decode_immediate_register_mov(unsigned char first_byte, FILE* fp)
 	unsigned char second_byte = getc(fp);
 
 	//get register to load
-	char* register_to_load = "register";
+	char register_to_load[3];
 	if ((first_byte >> 3 & 1) == 1) //W = 1
 	{
 		get_word_register_name(first_byte & 7, register_to_load);
@@ -495,7 +499,7 @@ int is_jump(unsigned char instruction, char* jump)
 
 	if (instruction == je)
 	{
-		strcpy_s(jump, MAX_JUMP_NAME, "je");
+		snprintf(jump, MAX_JUMP_NAME, "%s", "je");
 	}
 	else
 	{
@@ -554,14 +558,21 @@ int main(int argc, char** argv)
 			decode_accumulator(first_byte, fp, (first_byte >> 1) == memory_to_accumulator_mov || 
 			(first_byte >> 1) == accumulator_to_memory_mov, ((first_byte >> 1 & 1) == 0));
 		}
-		else if ((first_byte >> 4 & 7) == 7 || (first_byte >> 4 & 7) == 14)
+		else
 		{
 			char jump[MAX_JUMP_NAME] = "KO";
 			if (is_jump(first_byte, jump))
 			{
 				printf("%s ", jump);
-				//read jump destination in second byte
-				signed char offset = (signed char)fgetc(fp);
+				// Read the signed 8-bit relative displacement.
+				int offset_byte = fgetc(fp);
+				if (offset_byte == EOF)
+				{
+					fprintf(stderr, "Truncated jump instruction\n");
+					fclose(fp);
+					return EXIT_FAILURE;
+				}
+				int offset = (offset_byte & 0x80) ? offset_byte - 256 : offset_byte;
 
 				//This is something we need to do if we want to create an .asm file that is equivalent to using labels when assembled with NASM
 				//je $+0 means to jump 2 bytes before 
@@ -571,12 +582,20 @@ int main(int argc, char** argv)
 				//je label
 				//jnz label
 				//But this saves the work of having to printf labels (moving up and down)
-				signed char final_offset = offset + 2;
+				int final_offset = offset + 2;
 				printf("$+%d\n", final_offset);
+			}
+			else
+			{
+				fprintf(stderr, "Unsupported opcode 0x%02X at byte offset %ld\n",
+				        (unsigned)first_byte, ftell(fp) - 1);
+				fclose(fp);
+				return EXIT_FAILURE;
 			}
 		}
 	}
-	
-	return 0;	
+
+	fclose(fp);
+	return EXIT_SUCCESS;
 }
 
